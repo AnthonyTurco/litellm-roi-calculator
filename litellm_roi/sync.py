@@ -107,7 +107,8 @@ class SyncManager:
                     self.fast_reused += 1
                 else:
                     pending_items.append((index, (repo, pr)))
-            self.state.update(phase="estimates", stage="Estimating new or changed pull requests", total=len(queue),
+            self.state.update(phase="estimates",
+                stage=f"Estimating new or changed {'merge requests' if settings.git_provider == 'gitlab' else 'pull requests'}", total=len(queue),
                 done=self.fast_reused, estimated=self.fast_reused, reused=self.fast_reused)
             self.estimates_started_at = monotonic()
             pending = iter(pending_items)

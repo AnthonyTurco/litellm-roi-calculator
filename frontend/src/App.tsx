@@ -131,10 +131,10 @@ export function App() {
         </div>
       </div>
       {(error || connectionError || state.status.error) && <div className="notice text-destructive" role="alert">{error || connectionError || state.status.error}</div>}
-      {state.status.running && <div className="notice"><div className="min-w-0 flex-1"><SyncProgress status={state.status} /></div>
+      {state.status.running && <div className="notice"><div className="min-w-0 flex-1"><SyncProgress status={state.status} provider={state.settings.git_provider} /></div>
         <Button variant="outline" size="sm" onClick={() => void syncAction(true)} disabled={busy}>Cancel sync</Button></div>}
       {page === "settings" ? <SettingsForm state={state} refresh={refresh} onSync={startSync} /> : !report ?
-        <div className="rounded-lg border p-8 text-sm muted">{state.status.running ? "Your report will appear when the sync finishes." : "No report yet. Sync to import spend and estimate merged PRs."}</div> :
+        <div className="rounded-lg border p-8 text-sm muted">{state.status.running ? "Your report will appear when the sync finishes." : `No report yet. Sync to import spend and estimate merged ${gitTerms(state.settings.git_provider).prsLower}.`}</div> :
         page === "overview" ? <Overview report={report} onSelect={selectPR} onPeople={() => navigate("people")} provider={state.settings.git_provider} /> :
         <People report={report} onMatch={(login, email) => { setMatchError(""); setMatching({ login, email }); }} provider={state.settings.git_provider} />}
       {report && page !== "settings" && !demo && <p className="text-sm muted">

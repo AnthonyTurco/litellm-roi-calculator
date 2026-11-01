@@ -101,7 +101,7 @@ export function Onboarding({ state, refresh, connectionError }: {
           {activePhase > i ? <Check aria-label="Complete" /> : state.status.running && activePhase === i ? <Loader2 className="animate-spin" aria-label="In progress" /> : <Circle aria-label="Pending" />}
           <span>{label}</span>
         </li>)}</ol>
-        <div className="backfill-detail"><SyncProgress status={state.status} /></div>
+        <div className="backfill-detail"><SyncProgress status={state.status} provider={state.settings.git_provider} /></div>
         {state.status.error && <p role="alert" className="text-sm text-destructive mt-5">{state.status.error}</p>}
         <div className="onboarding-actions">
           {state.status.running ? <Button variant="outline" disabled={busy} onClick={() => void syncAction(true)}>Cancel backfill</Button> : <>

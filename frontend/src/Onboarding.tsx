@@ -9,12 +9,13 @@ import { Field, formValues, settingsUpdate, type FormValues } from "./configurat
 import { GitConnection } from "./GitConnection";
 import { githubConnectionFields } from "./GitHubConnection";
 import { azureDevOpsConnectionFields } from "./AzureDevOpsConnection";
+import { gitLabConnectionFields } from "./GitLabConnection";
 import { SyncProgress } from "./SyncProgress";
 
 const steps = ["Gateway", "Repositories", "Estimator & sync"];
 const stepFields = [
   ["gateway_url", "admin_key"],
-  [...githubConnectionFields, ...azureDevOpsConnectionFields, "repos"],
+  [...githubConnectionFields, ...azureDevOpsConnectionFields, ...gitLabConnectionFields, "repos"],
   ["estimator_model", "estimator_prompt", "estimator_key", "backfill_days", "update_interval_hours"],
 ];
 

@@ -1,9 +1,10 @@
 export interface Settings {
   gateway_url: string;
-  git_provider: "github" | "azure_devops";
+  git_provider: "github" | "azure_devops" | "gitlab";
   github_api_url: string;
   github_connection: "app" | "token";
   azure_devops_org: string;
+  gitlab_url: string;
   repos: string[];
   estimator_model: string;
   estimator_prompt: string;
@@ -14,6 +15,7 @@ export interface Settings {
   has_estimator_key: boolean;
   has_github_token: boolean;
   has_azure_devops_pat: boolean;
+  has_gitlab_pat: boolean;
   ready: boolean;
 }
 

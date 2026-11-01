@@ -200,6 +200,19 @@ def create_app(data_dir: Path | None = None, *, demo_only: bool = False) -> Fast
         finally:
             await provider.close()
 
+    @app.get("/api/gitlab/repos")
+    async def gitlab_repositories(group: str = Query(default="", pattern=r"^[A-Za-z0-9_./-]*$", max_length=100), page: int = Query(default=1, ge=1, le=10000)):
+        settings = config.load()
+        if settings.git_provider != "gitlab":
+            raise SourceError("Switch the git provider setting to GitLab first.")
+        if not settings.gitlab_pat:
+            raise SourceError("Add a GitLab personal access token to browse repositories.")
+        provider = git_provider_from_settings(settings)
+        try:
+            return await provider.repositories(group, page)
+        finally:
+            await provider.close()
+
     @app.post("/api/sync")
     async def sync():
         manager.start(config.load())

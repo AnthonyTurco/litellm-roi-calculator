@@ -27,5 +27,8 @@ def git_provider_from_settings(settings: Settings, transport=None, token_provide
     if settings.git_provider == "azure_devops":
         from .azure_devops import AzureDevOps
         return AzureDevOps(settings, transport=transport)
+    if settings.git_provider == "gitlab":
+        from .gitlab import GitLab
+        return GitLab(settings, transport=transport)
     from .connectors import GitHub
     return GitHub(settings, transport=transport, token_provider=token_provider)

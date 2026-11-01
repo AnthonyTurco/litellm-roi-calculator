@@ -1,6 +1,6 @@
 # LiteLLM ROI Calculator
 
-Connect your LiteLLM gateway and GitHub or Azure DevOps repositories to compare **AI spend with estimated engineering hours without AI assistance**.
+Connect your LiteLLM gateway and GitHub, Azure DevOps, or GitLab repositories to compare **AI spend with estimated engineering hours without AI assistance**.
 
 The calculator reads spend per user, estimates the work in merged PRs with a model you choose, and matches people by email. These are estimates of engineering effort—not actual hours worked, hours saved, or a claim of financial return.
 
@@ -32,7 +32,7 @@ If your read-only key cannot call models, add a separate inference key under **A
 
 ## 2. Connect repositories
 
-The calculator supports GitHub and Azure DevOps (Repos). Choose the **Repository host** in this step.
+The calculator supports GitHub, Azure DevOps (Repos), and GitLab. Choose the **Repository host** in this step.
 
 **GitHub:** click **Connect GitHub**. GitHub walks you through creating a read-only App for this calculator and choosing which repositories it can access. Return to the calculator and select your repositories—there are no client IDs or secrets to copy.
 
@@ -43,6 +43,8 @@ The calculator supports GitHub and Azure DevOps (Repos). Choose the **Repository
 - **More control:** use **Manage access** to change GitHub permissions. Tokens and GitHub Enterprise Server are under **Advanced connection settings**.
 
 **Azure DevOps:** enter your **organization** and a **personal access token** with the Code (Read) scope, then click **Browse repos** to select `project/repo` entries—optionally narrowed to one project.
+
+**GitLab:** enter your **GitLab server** (`https://gitlab.com` or a self-managed instance) and a **personal access token** with the `read_api` and `read_repository` scopes, then click **Browse repos** to select `group/project` entries—optionally narrowed to one group. The token's user needs at least the Reporter role on those projects.
 
 Click **Continue**. [Company and Enterprise connection details →](docs/reference.md#company-github-connections)
 

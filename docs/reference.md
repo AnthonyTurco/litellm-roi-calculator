@@ -22,6 +22,16 @@ Select **Azure DevOps** as the Repository host during setup or in Settings, then
 - **Line counts:** Azure DevOps does not publish per-file line additions and deletions through its REST API. Estimates on Azure Repos use PR description, per-file change types, and file/commit counts without line totals.
 - Azure DevOps Server (on-premises) is not supported; the provider targets `dev.azure.com` with API version 7.1.
 
+### GitLab connections
+
+Select **GitLab** as the Repository host during setup or in Settings, then enter your **GitLab server** (`https://gitlab.com` or the address of a self-managed instance) and a **personal access token** with the `read_api` and `read_repository` scopes over the projects you measure. The token inherits the permissions of its user, so the token's user needs at least the Reporter role on those projects. The recommendation is a short-lived company-approved PAT; the app only reads data and never follows redirects with credentials.
+
+- **Repository picker:** leave Group blank to browse the repositories the token's user is a member of, or enter one group (or subgroup path) to browse it and its subgroups. Repositories are referenced by their full path, such as `group/subgroup/project`; full `https://git.example.com/group/subgroup/project` URLs on the configured server are accepted.
+- **Identities:** PR authors and committers are matched by username; a commit email is accepted when the commit's GitLab account is the merge request author, along with the author profile's public email. Use **People → Match email** to map a username manually.
+- **Merge window:** merged merge requests are selected by `merged_at`. The API is asked for merged requests ordered by update time and paging stops once updates fall before the window, so a request merged inside the window is found even if it was merged without further activity. Requests are listed with `state=merged`, so the window cannot be narrowed server-side by merge date beyond this scan.
+- **Line counts:** a single GraphQL request per merge request returns the merged request's aggregated additions, deletions, changed-file count, and per-file line counts, plus commit messages with author emails. Per-commit line counts are not collected: GitLab limits commit statistics to 10 resolutions per GraphQL request and would multiply round trips. Totals can differ slightly from what the request patch represents at merge time if the source branch has moved since.
+- Requires a GitLab instance whose API supports merge request diff statistics and the commit connection fields used above; verify by running **Test connections** after setup.
+
 ### GitHub connection
 
 **Connect GitHub** opens a prefilled GitHub App registration for this deployment. Confirm it on GitHub, choose your account and repository access, and return to the repository picker. The App's credentials are exchanged automatically and kept on the server. You do not need to copy a client ID, client secret, or private key. The App requests only read access to Contents, Pull requests, and Metadata; it does not subscribe to webhooks or modify code.
@@ -46,12 +56,14 @@ When a gateway key is supplied through the environment, the gateway URL is also 
 | `LITELLM_ADMIN_KEY` | Read users, activity, and available models |
 | `LITELLM_ESTIMATOR_KEY` | Optional separate inference key; falls back to admin key |
 | `LITELLM_ESTIMATOR_MODEL` | Exact model/deployment name on the gateway |
-| `GIT_PROVIDER` | `github` (default) or `azure_devops` |
+| `GIT_PROVIDER` | `github` (default), `azure_devops`, or `gitlab` |
 | `GITHUB_TOKEN` | GitHub token, optional for public repositories |
 | `GITHUB_REPOS` | Comma-separated repository names |
 | `GITHUB_API_URL` | Optional Enterprise API URL, e.g. `https://github.example.com/api/v3` |
 | `AZURE_DEVOPS_ORG` | Azure DevOps organization name |
 | `AZURE_DEVOPS_PAT` | Azure DevOps personal access token with Code (Read) |
+| `GITLAB_URL` | GitLab server, e.g. `https://gitlab.com` or `https://gitlab.example.com` |
+| `GITLAB_PAT` | GitLab personal access token with `read_api` and `read_repository` |
 | `ROI_DATA_DIR` | Data location; defaults to `~/.litellm-roi` |
 | `ROI_PUBLIC_URL` | HTTPS origin when hosted; Render supplies `RENDER_EXTERNAL_URL` automatically |
 
@@ -80,7 +92,7 @@ Spend per estimated hour = matched gateway spend / matched estimated engineering
 
 ### Matching people
 
-Gateway users are matched by email to the PR author's public profile email (or Azure DevOps account email) or commit emails **associated with that same repository account**. Matching trims whitespace and ignores case. It does not guess from names, strip email aliases, or use another contributor's commit email. GitHub noreply addresses and ambiguous matches remain unmatched.
+Gateway users are matched by email to the PR author's public profile email (or Azure DevOps account email, or GitLab profile public email) or commit emails **associated with that same repository account**. Matching trims whitespace and ignores case. It does not guess from names, strip email aliases, or use another contributor's commit email. GitHub noreply addresses and ambiguous matches remain unmatched.
 
 In **People**, click **Match email** to connect a repository username or display name to a gateway email. Manual overrides take priority and immediately recalculate the report without re-estimating PRs. Multiple identities can map to the same gateway email without duplicating spend. PR effort is attributed to the PR author, not split among reviewers and co-authors.
 

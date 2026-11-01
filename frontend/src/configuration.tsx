@@ -1,6 +1,15 @@
 import type { ReactNode } from "react";
 import type { Settings } from "./api";
 
+export const gitTerms = (provider: string) => provider === "gitlab"
+  ? { host: "GitLab", pr: "Merge request", prs: "Merge requests", prsLower: "merge requests",
+      noMatch: "No GitLab match", matchHelp: "Matches use the author's public GitLab profile email or commit emails associated with their GitLab account. Email matching ignores case. Private, noreply, and ambiguous emails stay unmatched. Click a GitLab username to edit its match. Manual matches take priority." }
+  : provider === "azure_devops"
+  ? { host: "Azure DevOps", pr: "Pull request", prs: "Pull requests", prsLower: "pull requests",
+      noMatch: "No Azure DevOps match", matchHelp: "Matches use the author's Azure DevOps account email or commit emails associated with the same Azure DevOps account. Email matching ignores case. Ambiguous emails stay unmatched. Click a username to edit its match. Manual matches take priority." }
+  : { host: "GitHub", pr: "Pull request", prs: "Pull requests", prsLower: "pull requests",
+      noMatch: "No GitHub match", matchHelp: "Matches use the author's public GitHub email or commit emails associated with their GitHub account. Email matching ignores case. Private, noreply, and ambiguous emails stay unmatched. Click a GitHub username to edit its match. Manual matches take priority." };
+
 export type FormValues = {
   gateway_url: string; admin_key: string; estimator_key: string; github_token: string;
   git_provider: string; github_api_url: string; github_connection: string;

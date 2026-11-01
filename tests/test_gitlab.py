@@ -1,5 +1,5 @@
 import json
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 
 import httpx
 import pytest
@@ -35,8 +35,11 @@ def graph_response(merge_request, cursor=None):
 
 
 async def test_gitlab_pulls_filter_merged_window_and_normalize_shape(gitlab):
+    served_pages = []
+
     def handler(req):
         token_header(req)
+        served_pages.append(req.url.params["page"])
         assert req.url.raw_path.decode().split("?")[0] == "/api/v4/projects/group%3Fteam%2Fwidget/merge_requests"
         assert req.url.params["state"] == "merged"
         assert req.url.params["order_by"] == "updated_at"
@@ -52,6 +55,8 @@ async def test_gitlab_pulls_filter_merged_window_and_normalize_shape(gitlab):
             ],
             "2": [{"iid": 13, "title": "Old activity", "merged_at": None, "updated_at": "2026-08-30T00:00:00Z",
                 "sha": "456", "author": {"username": "alice"}}],
+            "3": [{"iid": 99, "title": "Never requested", "merged_at": "2026-09-20T00:00:00Z",
+                "updated_at": "2026-09-20T00:00:00Z", "sha": "999", "author": {"username": "alice"}}],
         }[req.url.params["page"]]
         return httpx.Response(200, headers={} if req.url.params["page"] == "2" else {"x-next-page": "2"}, json=page)
 
@@ -59,10 +64,24 @@ async def test_gitlab_pulls_filter_merged_window_and_normalize_shape(gitlab):
     pulls = await provider.pulls("group?team/widget", date(2026, 9, 1), date(2026, 9, 30))
     await provider.close()
     assert [p["number"] for p in pulls] == [10]
+    # Paging stops when updates fall before the window; page 3 would have matched but is never fetched.
+    assert served_pages == ["1", "2"]
     assert pulls[0] == {"number": 10, "title": "Fix api", "body": "Details",
         "url": "https://gitlab.acme.com/group/team/widget/-/merge_requests/10",
         "login": "alice", "merged_at": "2026-09-15T12:00:00Z",
         "updated_at": "2026-09-16T08:00:00Z", "head_sha": "abc"}
+
+
+def test_gitlab_legacy_match_uses_the_configured_server_host(gitlab):
+    from litellm_roi.pull_cache import legacy_match
+    previous = {"estimator_model": gitlab.estimator_model, "estimator_prompt": gitlab.estimator_prompt,
+        "synced_at": datetime.fromisoformat("2026-09-20T12:00:00Z")}
+    cached = {"url": "https://gitlab.acme.com/team/widget/-/merge_requests/10", "head_sha": "abc",
+        "title": "Tidy", "login": "alice", "updated_at": "2026-09-15T10:00:00Z",
+        "estimate": {"status": "estimated", "evidence_source": "pr_metadata", "effort_basis": "without_ai"}}
+    pr = {"head_sha": "abc", "title": "Tidy", "login": "alice", "updated_at": "2026-09-15T10:00:00Z"}
+    assert legacy_match(gitlab, previous, cached, pr)
+    assert not legacy_match(gitlab, previous, {**cached, "url": "https://other.example.com/team/widget/-/merge_requests/10"}, pr)
 
 
 async def test_gitlab_evidence_maps_identities_files_and_commit_metadata(gitlab):
@@ -207,6 +226,19 @@ async def test_gitlab_graphql_errors_become_source_errors(gitlab):
     await provider.close()
 
 
+async def test_gitlab_graphql_missing_merge_request_is_a_source_error(gitlab):
+    def handler(req):
+        token_header(req)
+        if req.url.path == "/api/graphql":
+            return httpx.Response(200, json={"data": {"project": None}})
+        return httpx.Response(200, json={"iid": 10, "title": "Fix api", "author": {"username": "alice"}})
+
+    provider = GitLab(gitlab, httpx.MockTransport(handler))
+    with pytest.raises(SourceError):
+        await provider.evidence("team/widget", {"number": 10})
+    await provider.close()
+
+
 async def test_gitlab_diff_stats_fallback_sums_files_when_summary_missing(gitlab):
     def handler(req):
         token_header(req)
@@ -227,6 +259,27 @@ async def test_gitlab_diff_stats_fallback_sums_files_when_summary_missing(gitlab
     assert evidence["additions"] == 40 and evidence["deletions"] == 0
     assert evidence["changed_files"] == 1
     assert evidence["incomplete_metadata"] is False
+
+
+async def test_gitlab_null_totals_are_flagged_for_review(gitlab):
+    def handler(req):
+        token_header(req)
+        if req.url.path == "/api/graphql":
+            if b"diffStatsSummary" in req.content:
+                return httpx.Response(200, json=graph_response({
+                    "diffStatsSummary": {"additions": None, "deletions": 0, "fileCount": 1},
+                    "diffStats": [{"path": "src/new.py", "additions": 0, "deletions": 0}]}))
+            return httpx.Response(200, json=graph_response({"commitCount": 1,
+                "commits": {"pageInfo": {"hasNextPage": False},
+                    "nodes": [{"sha": "abc", "message": "Fix api", "authorEmail": "alice@example.com",
+                    "authorName": "Alice", "author": {"username": "alice"}}]}}))
+        return httpx.Response(200, json={"iid": 10, "title": "Too large", "merged_at": "2026-09-15T12:00:00Z",
+            "sha": "abc", "author": {"username": "alice"}})
+
+    provider = GitLab(gitlab, httpx.MockTransport(handler))
+    evidence = await provider.evidence("team/widget", {"number": 10})
+    await provider.close()
+    assert evidence["incomplete_metadata"] is True
 
 
 async def test_gitlab_repositories_page_and_group_filter(gitlab):
@@ -287,6 +340,12 @@ def test_gitlab_settings_validate_repos_subgroups_and_urls():
         Settings(git_provider="gitlab", repos=["widget"])
     with pytest.raises(ValidationError):
         Settings(git_provider="gitlab", repos=["https://gitlab.acme.com/group/widget?ref=main"])
+    # Web UI paths are not project paths.
+    with pytest.raises(ValidationError):
+        Settings(git_provider="gitlab", repos=["https://gitlab.acme.com/group/widget/-/merge_requests/12"])
+    with pytest.raises(ValidationError):
+        Settings(git_provider="gitlab", gitlab_url="http://gitlab.acme.com")
+    assert Settings(git_provider="gitlab", gitlab_url="http://localhost").gitlab_url == "http://localhost"
 
 
 def test_gitlab_pat_is_secret_locked_and_cleared_with_url_change(tmp_path, monkeypatch):

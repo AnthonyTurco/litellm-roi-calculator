@@ -46,6 +46,8 @@ def legacy_match(settings: Settings, previous: dict, cached: dict, pr: dict) -> 
     source = urlsplit(settings.cache_source)
     if settings.git_provider == "azure_devops":
         web_host = "dev.azure.com"
+    elif settings.git_provider == "gitlab":
+        web_host = source.hostname or ""
     else:
         api_host = source.hostname or ""
         web_host = "github.com" if api_host == "api.github.com" else api_host.removeprefix("api.")

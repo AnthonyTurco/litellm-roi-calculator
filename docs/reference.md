@@ -24,12 +24,12 @@ Select **Azure DevOps** as the Repository host during setup or in Settings, then
 
 ### GitLab connections
 
-Select **GitLab** as the Repository host during setup or in Settings, then enter your **GitLab server** (`https://gitlab.com` or the address of a self-managed instance) and a **personal access token** with the `read_api` and `read_repository` scopes over the projects you measure. The token inherits the permissions of its user, so the token's user needs at least the Reporter role on those projects. The recommendation is a short-lived company-approved PAT; the app only reads data and never follows redirects with credentials.
+Select **GitLab** as the Repository host during setup or in Settings, then enter your **GitLab server** (`https://gitlab.com` or the address of a self-managed instance) and a **personal access token** with the `read_api` scope over the projects you measure. The token inherits the permissions of its user, so the token's user needs at least the Reporter role on those projects. The recommendation is a short-lived company-approved PAT; the app only reads data and never follows redirects with credentials. Server addresses must use https (plain http only for localhost).
 
 - **Repository picker:** leave Group blank to browse the repositories the token's user is a member of, or enter one group (or subgroup path) to browse it and its subgroups. Repositories are referenced by their full path, such as `group/subgroup/project`; full `https://git.example.com/group/subgroup/project` URLs on the configured server are accepted.
 - **Identities:** PR authors and committers are matched by username; a commit email is accepted when the commit's GitLab account is the merge request author, along with the author profile's public email. Use **People → Match email** to map a username manually.
 - **Merge window:** merged merge requests are selected by `merged_at`. The API is asked for merged requests ordered by update time and paging stops once updates fall before the window, so a request merged inside the window is found even if it was merged without further activity. Requests are listed with `state=merged`, so the window cannot be narrowed server-side by merge date beyond this scan.
-- **Line counts:** a single GraphQL request per merge request returns the merged request's aggregated additions, deletions, changed-file count, and per-file line counts, plus commit messages with author emails. Per-commit line counts are not collected: GitLab limits commit statistics to 10 resolutions per GraphQL request and would multiply round trips. Totals can differ slightly from what the request patch represents at merge time if the source branch has moved since.
+- **Line counts:** a single GraphQL request per merge request returns the merged request's aggregated additions, deletions, changed-file count, and per-file line counts, plus commit messages with author emails. Per-commit line counts are not collected; fetching per-commit statistics would multiply round trips, so evidence carries the merge request totals. If GitLab reports a commit count that disagrees with the paged commit list, or returns no diff statistics, the request is flagged for review instead of estimated. Totals can differ slightly from the request's content at merge time if the source branch has moved since.
 - Requires a GitLab instance whose API supports merge request diff statistics and the commit connection fields used above; verify by running **Test connections** after setup.
 
 ### GitHub connection
@@ -63,7 +63,7 @@ When a gateway key is supplied through the environment, the gateway URL is also 
 | `AZURE_DEVOPS_ORG` | Azure DevOps organization name |
 | `AZURE_DEVOPS_PAT` | Azure DevOps personal access token with Code (Read) |
 | `GITLAB_URL` | GitLab server, e.g. `https://gitlab.com` or `https://gitlab.example.com` |
-| `GITLAB_PAT` | GitLab personal access token with `read_api` and `read_repository` |
+| `GITLAB_PAT` | GitLab personal access token with `read_api` |
 | `ROI_DATA_DIR` | Data location; defaults to `~/.litellm-roi` |
 | `ROI_PUBLIC_URL` | HTTPS origin when hosted; Render supplies `RENDER_EXTERNAL_URL` automatically |
 

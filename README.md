@@ -44,7 +44,7 @@ The calculator supports GitHub, Azure DevOps (Repos), and GitLab. Choose the **R
 
 **Azure DevOps:** enter your **organization** and a **personal access token** with the Code (Read) scope, then click **Browse repos** to select `project/repo` entries—optionally narrowed to one project.
 
-**GitLab:** enter your **GitLab server** (`https://gitlab.com` or a self-managed instance) and a **personal access token** with the `read_api` and `read_repository` scopes, then click **Browse repos** to select `group/project` entries—optionally narrowed to one group. The token's user needs at least the Reporter role on those projects.
+**GitLab:** enter your **GitLab server** (`https://gitlab.com` or a self-managed instance) and a **personal access token** with the `read_api` scope, then click **Browse repos** to select `group/project` entries—optionally narrowed to one group. The token's user needs at least the Reporter role on those projects.
 
 Click **Continue**. [Company and Enterprise connection details →](docs/reference.md#company-github-connections)
 

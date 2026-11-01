@@ -1,9 +1,10 @@
 """GitLab provider using the REST and GraphQL APIs with a personal access token.
 
 Repository listing, the merged-merge-request window scan, and probes use REST;
-merge request evidence uses GraphQL for diff statistics and commits. Per-commit
-line statistics are omitted: GitLab limits commit statistics to 10 resolutions
-per GraphQL request, so evidence carries the merge request totals instead.
+merge request evidence uses GraphQL for diff statistics and commits.
+Per-commit line statistics are omitted: for large merge requests GitLab may
+omit or reject statistics, and fetching per-commit line stats would multiply
+round trips, so evidence carries the merge request totals instead.
 """
 
 from urllib.parse import quote
@@ -100,13 +101,13 @@ class GitLab:
         author = detail.get("author") or {}
         login = author.get("username", "") or "deleted-user"
         profile_email = email(author.get("public_email"))
-        summary, files = await self._diff_stats(repo, number)
+        summary, files, stats_missing = await self._diff_stats(repo, number)
         commits, authors, commit_count = await self._commit_metadata(repo, number)
         emails = {profile_email} if profile_email else set()
-        for author in authors:
-            if author["login"].casefold() == login.casefold() and (address := email(author["email"])):
+        for commit_author in authors:
+            if commit_author["login"].casefold() == login.casefold() and (address := email(commit_author["email"])):
                 emails.add(address)
-        missing = False
+        missing = stats_missing
         if summary["fileCount"] != len(files) or (commit_count is not None and commit_count != len(commits)):
             missing = True
         return {"repo": repo, "number": number, "title": detail.get("title", ""),
@@ -119,17 +120,23 @@ class GitLab:
             "commits": commits, "commit_count": commit_count if commit_count is not None else len(commits),
             "incomplete_metadata": missing}
 
-    async def _diff_stats(self, repo: str, number: int) -> tuple[dict, list]:
+    async def _diff_stats(self, repo: str, number: int) -> tuple[dict, list, bool]:
         merge_request = await self._query(STATS_QUERY, {"fullPath": repo.strip().strip("/"), "iid": str(number)})
-        summary = merge_request.get("diffStatsSummary")
-        files = [{"filename": entry.get("path", ""), "additions": entry.get("additions", 0),
-            "deletions": entry.get("deletions", 0)} for entry in (merge_request.get("diffStats") or [])]
+        summary, missing = merge_request.get("diffStatsSummary"), False
+        if summary and (summary.get("additions") is None or summary.get("deletions") is None or summary.get("fileCount") is None):
+            # GitLab declined the statistics; fall back to the returned files and mark the request incomplete.
+            missing = True
+            summary = None
         if not summary:
-            # Diff statistics were absent; totals fall back to the returned files.
+            summary = {"fileCount": 0}
+        files = [{"filename": entry.get("path", ""), "additions": entry.get("additions") or 0,
+            "deletions": entry.get("deletions") or 0} for entry in (merge_request.get("diffStats") or [])]
+        if not summary.get("fileCount"):
+            # Totals fall back to the returned files.
             summary = {"additions": sum(entry["additions"] for entry in files),
                 "deletions": sum(entry["deletions"] for entry in files), "fileCount": len(files)}
-        return {"additions": summary.get("additions", 0), "deletions": summary.get("deletions", 0),
-            "fileCount": summary.get("fileCount", len(files))}, files
+        return {"additions": summary["additions"], "deletions": summary["deletions"],
+            "fileCount": summary["fileCount"]}, files, missing
 
     async def _commit_metadata(self, repo: str, number: int) -> tuple[list, list, int | None]:
         commit_count = None
@@ -148,8 +155,10 @@ class GitLab:
             page_info = connection.get("pageInfo") or {}
             if not page_info.get("hasNextPage"):
                 return commits, authors, commit_count
-            if not (cursor := page_info.get("endCursor") or ""):
+            next_cursor = page_info.get("endCursor") or ""
+            if next_cursor in ("", cursor):
                 raise SourceError("GitLab returned incomplete commit metadata. No partial report was saved.")
+            cursor = next_cursor
         raise SourceError("GitLab commit metadata exceeded the pagination limit.")
 
     async def _query(self, query: str, variables: dict) -> dict:
@@ -157,4 +166,7 @@ class GitLab:
             json={"query": query, "variables": variables}))
         if data.get("errors"):
             raise SourceError("GitLab could not read merge request statistics. Check repository permissions and API compatibility.")
-        return ((data.get("data") or {}).get("project") or {}).get("mergeRequest") or {}
+        merge_request = ((data.get("data") or {}).get("project") or {}).get("mergeRequest")
+        if not merge_request:
+            raise SourceError("GitLab could not read the merge request statistics. Check the repository path and the number.")
+        return merge_request

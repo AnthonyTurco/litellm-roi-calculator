@@ -73,6 +73,13 @@ class Settings(BaseModel):
             raise ValueError("Put credentials in the key field; URLs cannot contain credentials, query, or fragment.")
         return value
 
+    @field_validator("gitlab_url")
+    @classmethod
+    def secure_gitlab_url(cls, value: str) -> str:
+        if value and urlsplit(value).scheme == "http" and (urlsplit(value).hostname or "") not in {"localhost", "127.0.0.1", "::1"}:
+            raise ValueError("Use an https:// address for the GitLab server; the personal access token is sent with every request.")
+        return value
+
     @field_validator("repos")
     @classmethod
     def valid_repos(cls, values: list[str], info: ValidationInfo) -> list[str]:
@@ -102,16 +109,14 @@ class Settings(BaseModel):
                     value = parsed.path.strip("/")
             value = value.rstrip("/").removesuffix(".git")
             if info.data.get("git_provider") == "gitlab":
-                pattern = r"[^/]+(?:/[^/]+)+"
-            elif info.data.get("git_provider") == "azure_devops":
-                pattern = r"[^/]+/[^/]+"
-            else:
-                pattern = r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+"
-            if not re.fullmatch(pattern, value.strip()):
-                if info.data.get("git_provider") == "gitlab":
+                # "-" alone cannot be a valid GitLab slug; "/-/..." sections are web UI paths, not project paths.
+                if not re.fullmatch(r"[^/]+(?:/[^/]+)+", value.strip()) or re.search(r"(^|/)-(/|$)", value.strip()):
                     raise ValueError("Repositories must be group/project (subgroups allowed) or a GitLab repository URL.")
-                raise ValueError("Repositories must be project/repo or a repository URL." if info.data.get("git_provider") == "azure_devops"
-                    else "Repositories must be owner/repo or a GitHub repository URL.")
+            else:
+                pattern = r"[^/]+/[^/]+" if info.data.get("git_provider") == "azure_devops" else r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+"
+                if not re.fullmatch(pattern, value.strip()):
+                    raise ValueError("Repositories must be project/repo or a repository URL." if info.data.get("git_provider") == "azure_devops"
+                        else "Repositories must be owner/repo or a GitHub repository URL.")
             value = value.strip()
             if value.casefold() not in seen:
                 repos.append(value)

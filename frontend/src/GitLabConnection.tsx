@@ -57,7 +57,7 @@ export function GitLabConnection({ values, saved, locked, update, saveConnection
       <Input name="gitlab_url" value={values.gitlab_url} disabled={locked("gitlab_url")}
         placeholder="https://gitlab.example.com" autoComplete="off" onChange={e => update("gitlab_url", e.target.value)} required />
     </Field>
-    <Field label="Personal access token" locked={locked("gitlab_pat")} help="Needs the read_api and read_repository scopes, with Reporter access to the projects you select.">
+    <Field label="Personal access token" locked={locked("gitlab_pat")} help="Needs the read_api scope, with Reporter access to the projects you select.">
       <Input name="gitlab_pat" type="password" autoComplete="new-password" value={values.gitlab_pat} disabled={locked("gitlab_pat")}
         placeholder={saved.has_gitlab_pat ? "Saved. Leave blank to keep." : "PAT with read_api"} onChange={e => update("gitlab_pat", e.target.value)} />
     </Field>

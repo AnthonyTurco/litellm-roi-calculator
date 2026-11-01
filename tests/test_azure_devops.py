@@ -199,13 +199,15 @@ async def test_full_azure_sync_produces_report_without_line_counts(azure, tmp_pa
     azure.admin_key = "test-gateway"
     azure.repos = ["Contoso/widget"]
     azure.estimator_model = "test-model"
+    # utcnow matches the sync window's clock; date.today() would break in timezones ahead of UTC.
+    today = sync_module.utcnow().date()
 
     def handler(req):
         if req.url.host == "gateway.example.com":
             if req.url.path == "/user/list":
                 return httpx.Response(200, json={"users": [{"user_id": "u1", "user_email": "alice@example.com"}], "total_pages": 1})
             if req.url.path == "/user/daily/activity":
-                return httpx.Response(200, json={"results": [{"date": date.today().isoformat(), "metrics": {"spend": 3},
+                return httpx.Response(200, json={"results": [{"date": today.isoformat(), "metrics": {"spend": 3},
                     "breakdown": {"entities": {"u1": {"metrics": {"spend": 3}}}}}], "metadata": {"has_more": False}})
             if req.url.path == "/v1/chat/completions":
                 content = json.loads(req.content)["messages"][-1]["content"]
@@ -223,12 +225,12 @@ async def test_full_azure_sync_produces_report_without_line_counts(azure, tmp_pa
             return httpx.Response(200, json={"value": [
                 {"commitId": "abc", "comment": "Tidy", "author": {"name": "Alice Silva", "email": "alice@example.com"}}]})
         if path.endswith("/pullrequests/10"):
-            return httpx.Response(200, json={"title": "Tidy", "description": "Cleanup", "closedDate": date.today().isoformat() + "T10:00:00Z",
+            return httpx.Response(200, json={"title": "Tidy", "description": "Cleanup", "closedDate": today.isoformat() + "T10:00:00Z",
                 "createdBy": {"displayName": "Alice Silva", "uniqueName": "alice@example.com"},
                 "lastMergeSourceCommit": {"commitId": "abc"}})
         if path.endswith("/pullrequests"):
             return httpx.Response(200, json={"value": [
-                {"pullRequestId": 10, "title": "Tidy", "description": "Cleanup", "closedDate": date.today().isoformat() + "T10:00:00Z",
+                {"pullRequestId": 10, "title": "Tidy", "description": "Cleanup", "closedDate": today.isoformat() + "T10:00:00Z",
                     "createdBy": {"displayName": "Alice Silva"}, "lastMergeSourceCommit": {"commitId": "abc"}}]})
         raise AssertionError(req.url)
 
